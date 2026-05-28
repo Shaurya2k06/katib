@@ -1,5 +1,11 @@
 # Changelog
 
+# [v0.99.0](https://github.com/kubeflow/katib/tree/v0.99.0) (2026-05-28)
+
+## Misc
+
+- test: fork release automation validation
+
 # [v0.19.0](https://github.com/kubeflow/katib/tree/v0.19.0) (2025-10-30)
 
 ## New Features
