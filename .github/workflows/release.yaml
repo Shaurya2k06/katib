@@ -29,7 +29,7 @@ concurrency:
 jobs:
   prepare:
     name: Prepare release branch
-    if: github.repository == 'kubeflow/katib' && !(github.event_name == 'push' && startsWith(github.ref, 'refs/heads/release-') && github.actor == 'github-actions[bot]')
+    # if: github.repository == 'kubeflow/katib' && !(github.event_name == 'push' && startsWith(github.ref, 'refs/heads/release-') && github.actor == 'github-actions[bot]')
     runs-on: ubuntu-22.04
     outputs:
       version: ${{ steps.vars.outputs.version }}
