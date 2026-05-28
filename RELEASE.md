@@ -54,23 +54,18 @@ This updates:
 - `hack/python-api/gen-api.sh` and `api/python_api/kubeflow_katib_api/__init__.py`
 - `CHANGELOG.md` (stable releases only, when `git-cliff` is installed)
 
-Validate locally:
-
-```sh
-make test-release
-```
-
-Open a PR:
+Review the diff (`git diff`) and open a PR:
 
 - **Latest minor series** → PR to `master`
 - **Older patch** → PR to `release-X.Y`
 
 Wait for the [Check Release](https://github.com/kubeflow/katib/actions/workflows/check-release.yaml) workflow.
 
+Before merge, run the [Release workflow](https://github.com/kubeflow/katib/actions/workflows/release.yaml) on your PR branch with **`dry_run: true`** (default). This runs the same Prepare and Build jobs as a real release without pushing branches, tags, or publishing artifacts.
+
 ### 2. Automated release
 
-Merge the PR. A push that changes `sdk/python/v1beta1/setup.py` triggers the
-[Release workflow](https://github.com/kubeflow/katib/actions/workflows/release.yaml), which:
+Merge the PR. A push that changes `sdk/python/v1beta1/setup.py` triggers the Release workflow, which:
 
 1. **Prepare** — creates or updates `release-X.Y`, pins manifest image tags on that branch
 2. **Build** — validates versions, builds Python packages
@@ -78,8 +73,6 @@ Merge the PR. A push that changes `sdk/python/v1beta1/setup.py` triggers the
 4. **Publish images** — multi-arch images to GHCR and DockerHub
 
 Confirm the release branch and tag appear on GitHub.
-
-Optional: run the Release workflow manually with `dry_run: true` on your PR branch before merge.
 
 ### 3. Manual approvals
 
@@ -98,7 +91,3 @@ Optional: run the Release workflow manually with `dry_run: true` on your PR bran
 For minor/major releases, announce on Kubeflow community channels
 ([Slack](https://www.kubeflow.org/docs/about/community/#kubeflow-slack-channels),
 [mailing list](https://www.kubeflow.org/docs/about/community/#kubeflow-mailing-list)).
-
-## Local and fork testing
-
-See [docs/release/RELEASE_TESTING.md](docs/release/RELEASE_TESTING.md).
