@@ -1,5 +1,7 @@
 # Changelog
 
+> New releases are recorded under [`CHANGELOG/`](./CHANGELOG/). This file retains historical entries.
+
 # [v0.19.0](https://github.com/kubeflow/katib/tree/v0.19.0) (2025-10-30)
 
 ## New Features

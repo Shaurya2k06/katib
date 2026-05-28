@@ -129,10 +129,19 @@ endif
 	bash scripts/v1beta1/build.sh $(KATIB_REGISTRY) $(TAG) $(CPU_ARCH)
 	bash scripts/v1beta1/push.sh $(KATIB_REGISTRY) $(TAG)
 
-# Release a new version of Katib.
+# Create a release commit via hack/release.sh (see RELEASE.md).
 release:
+	@if [ -z "$(VERSION)" ]; then \
+		echo "ERROR: VERSION is required. Usage: make release VERSION=X.Y.Z GITHUB_TOKEN=<token>"; \
+		exit 1; \
+	fi
+	@export GITHUB_TOKEN=$(GITHUB_TOKEN); \
+	./hack/release.sh $(VERSION)
+
+# Legacy manual release that builds and publishes locally.
+release-manual:
 ifeq ($(and $(BRANCH),$(TAG)),)
-	$(error BRANCH and TAG must be set. Usage: make release BRANCH=<branch> TAG=<tag>)
+	$(error BRANCH and TAG must be set. Usage: make release-manual BRANCH=<branch> TAG=<tag>)
 endif
 	bash scripts/v1beta1/release.sh $(BRANCH) $(TAG)
 

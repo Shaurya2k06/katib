@@ -1,0 +1,67 @@
+# Validate release PRs before merge.
+name: Check Release
+
+on:
+  pull_request:
+    branches:
+      - master
+      - "release-*"
+    paths:
+      - VERSION
+      - "sdk/python/v1beta1/setup.py"
+      - "hack/python-api/gen-api.sh"
+      - "api/python_api/kubeflow_katib_api/__init__.py"
+      - "CHANGELOG/**"
+
+concurrency:
+  group: check-release-${{ github.event.pull_request.number }}
+  cancel-in-progress: true
+
+env:
+  SEMVER_PATTERN: '^(v)?([0-9]+)\.([0-9]+)\.([0-9]+)(-rc\.([0-9]+))?$'
+
+jobs:
+  check:
+    name: Validate Release Consistency
+    runs-on: ubuntu-22.04
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: Parse VERSION
+        shell: bash
+        run: |
+          RAW_VERSION=$(tr -d ' \n' < VERSION)
+          VERSION=${RAW_VERSION#v}
+          if [[ ! ${RAW_VERSION} =~ ${{ env.SEMVER_PATTERN }} ]]; then
+            echo "Version '${RAW_VERSION}' does not match semver pattern."
+            exit 1
+          fi
+          TAG="v${VERSION}"
+          echo "VERSION=${VERSION}" >> $GITHUB_ENV
+          echo "TAG=${TAG}" >> $GITHUB_ENV
+
+      - name: Check if tag exists
+        shell: bash
+        run: |
+          git fetch --tags
+          if git tag -l | grep -q "^${TAG}$"; then
+            echo "Tag '${TAG}' already exists."
+            exit 1
+          fi
+          echo "Tag '${TAG}' does not exist."
+
+      - name: Validate Python package versions
+        shell: bash
+        run: |
+          EXPECTED=$(echo "$VERSION" | sed 's/-rc\.\([0-9]*\)/rc\1/')
+          SDK_VERSION=$(grep -E 'version="[^"]+"' sdk/python/v1beta1/setup.py | head -1 | sed -E 's/.*version="([^"]+)".*/\1/')
+          API_VERSION=$(grep 'API_VERSION=' hack/python-api/gen-api.sh | head -1 | sed -E 's/.*API_VERSION="([^"]+)".*/\1/')
+          MODELS_VERSION=$(grep '__version__' api/python_api/kubeflow_katib_api/__init__.py | sed -E 's/.*"([^"]+)".*/\1/')
+
+          if [[ "${SDK_VERSION}" != "${EXPECTED}" || "${API_VERSION}" != "${EXPECTED}" || "${MODELS_VERSION}" != "${EXPECTED}" ]]; then
+            echo "Python package versions do not match VERSION."
+            exit 1
+          fi
