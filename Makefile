@@ -153,7 +153,7 @@ ifeq ($(and $(BRANCH),$(TAG)),)
 endif
 	bash scripts/v1beta1/release.sh $(BRANCH) $(TAG)
 
-# Local dry-run validator for the release workflow (see docs/release/RELEASE_TESTING.md).
+# Local dry-run validator for the release workflow (see RELEASE.md and docs/release/RELEASE_TESTING.md).
 test-release:
 	bash scripts/v1beta1/test-release.sh
 

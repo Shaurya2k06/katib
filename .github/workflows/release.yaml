@@ -106,6 +106,29 @@ jobs:
           fi
           git push origin "$BRANCH"
 
+      - name: Pin manifest image tags on release branch
+        if: steps.vars.outputs.dry-run != 'true'
+        shell: bash
+        run: |
+          set -euo pipefail
+          TAG="${{ steps.vars.outputs.tag }}"
+          bash scripts/v1beta1/update-images.sh ghcr.io/kubeflow/katib/ ghcr.io/kubeflow/katib/ "$TAG"
+
+      - name: Commit and push manifest pins
+        if: steps.vars.outputs.dry-run != 'true'
+        shell: bash
+        run: |
+          set -euo pipefail
+          TAG="${{ steps.vars.outputs.tag }}"
+          BRANCH="${{ steps.vars.outputs.branch }}"
+          if git diff --quiet; then
+            echo "Manifest tags already pinned to ${TAG}."
+          else
+            git add manifests/
+            git commit -s -m "Pin manifest image tags to ${TAG}"
+            git push origin "$BRANCH"
+          fi
+
       - name: Plan release branch update (dry run)
         if: steps.vars.outputs.dry-run == 'true'
         shell: bash
@@ -135,6 +158,7 @@ jobs:
           fi
 
           echo "Post-build actions skipped in dry run:"
+          echo "  - pin manifest image tags on ${BRANCH} and push"
           echo "  - push tag ${TAG}"
           echo "  - publish 22 multi-arch container images"
           echo "  - publish kubeflow-katib and kubeflow_katib_api to PyPI"
@@ -177,6 +201,11 @@ jobs:
             exit 1
           fi
 
+      - name: Verify manifest image tags
+        if: needs.prepare.outputs.dry-run != 'true'
+        shell: bash
+        run: |
+          TAG="${{ needs.prepare.outputs.tag }}"
           MANIFEST_TAGS=$(grep -r 'newTag:' manifests/v1beta1/installs | sed 's/.*newTag:[[:space:]]*//' | sort | uniq)
           for t in ${MANIFEST_TAGS}; do
             if [[ "${t}" != "${TAG}" ]]; then
@@ -276,7 +305,8 @@ jobs:
             echo "Tag $TAG already exists. Skipping"
             exit 0
           fi
-          git tag "$TAG"
+          TAG_SHA=$(git rev-parse HEAD)
+          git tag "$TAG" "$TAG_SHA"
           git push origin "$TAG"
 
   publish-images:
@@ -379,6 +409,7 @@ jobs:
         with:
           tag_name: ${{ needs.prepare.outputs.tag }}
           name: ${{ needs.prepare.outputs.tag }}
+          target_commitish: ${{ needs.prepare.outputs.branch }}
           body: ${{ steps.changelog.outputs.changelog }}
           draft: false
           prerelease: ${{ needs.prepare.outputs.is-prerelease == 'true' }}

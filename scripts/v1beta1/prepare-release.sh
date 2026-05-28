@@ -14,7 +14,8 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-# Prepare a Katib release by updating manifests and Python package versions.
+# Prepare a Katib release by updating Python package versions.
+# Manifest image tags are pinned on the release branch by CI (see .github/workflows/release.yaml).
 # Run from the repository root: ./scripts/v1beta1/prepare-release.sh <VERSION>
 # For example: ./scripts/v1beta1/prepare-release.sh 0.19.1
 
@@ -48,8 +49,6 @@ SCRIPT_ROOT=$(cd "$(dirname "${BASH_SOURCE[0]}")/../.." && pwd)
 cd "${SCRIPT_ROOT}"
 
 echo -e "\nPreparing Katib release. Version: ${VERSION}, Tag: ${TAG}\n"
-
-make update-images OLD_PREFIX="ghcr.io/kubeflow/katib/" NEW_PREFIX="ghcr.io/kubeflow/katib/" TAG="${TAG}"
 
 echo -e "\nUpdating Katib Python SDK version to ${VERSION}\n"
 if [[ $(uname) == "Darwin" ]]; then

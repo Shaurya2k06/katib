@@ -145,18 +145,10 @@ if [[ "${SDK_VERSION}" != "${VERSION}" || "${API_VERSION}" != "${VERSION}" || "$
 fi
 pass "Python package versions are consistent"
 
-section "Verify manifest image tags"
-MANIFEST_TAGS=$(grep -r 'newTag:' manifests/v1beta1/installs | sed 's/.*newTag:[[:space:]]*//' | sort | uniq)
-if [[ -z "$MANIFEST_TAGS" ]]; then
-  fail "No newTag entries found under manifests/v1beta1/installs"
-fi
-
-for t in ${MANIFEST_TAGS}; do
-  if [[ "${t}" != "${TAG}" ]]; then
-    fail "Manifest newTag '${t}' does not match release tag '${TAG}'"
-  fi
-done
-pass "Manifest image tags match ${TAG}"
+section "Manifest image tags"
+echo "Manifests on master use newTag: latest; CI pins tags on the release branch during Prepare."
+echo "Skipping local manifest tag check (aligned with automated release workflow)."
+pass "Manifest pinning deferred to CI"
 
 section "Verify changelog"
 if [[ "${IS_PRERELEASE}" == "true" ]]; then
@@ -236,5 +228,5 @@ Next steps:
   3. Run CI dry run: Actions -> Release -> Run workflow (dry_run: true)
   4. Merge PR or re-run workflow with dry_run: false for a real release
 
-See docs/release/RELEASE_TESTING.md for fork and CI testing details.
+See RELEASE.md and docs/release/RELEASE_TESTING.md for fork and CI testing details.
 EOF

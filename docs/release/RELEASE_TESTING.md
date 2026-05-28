@@ -2,17 +2,22 @@
 
 This guide explains how to validate the Katib release pipeline locally and on a fork before running a real release on `kubeflow/katib`.
 
+See [RELEASE.md](../../RELEASE.md) for the maintainer release process.
+
 ## Overview
 
 The release workflow (`.github/workflows/release.yaml`) can be tested at three levels:
 
 | Level | Tool | What it validates |
 | --- | --- | --- |
-| **Local script** | `make test-release` | Version consistency, manifests, changelog, package build |
+| **Local script** | `make test-release` | Version consistency, changelog, package build |
 | **CI dry run** | GitHub Actions `dry_run: true` | Same as local script, plus workflow wiring on GitHub runners |
 | **PR gate** | Check Release workflow | Version consistency on pull requests |
 
 The local script mirrors the **Prepare** and **Build** jobs when `dry_run: true`.
+
+Manifest image tags are **not** updated locally — they stay at `latest` on `master`. CI pins them on the
+`release-X.Y` branch during the Prepare job.
 
 ## Quick Start (Local)
 
@@ -49,10 +54,9 @@ The script runs the same validations as the CI dry run:
 
 1. **Parse metadata** — reads `setup.py`, derives tag (`vX.Y.Z`), branch (`release-X.Y`), pre-release flag
 2. **Version consistency** — `setup.py`, `gen-api.sh`, `kubeflow_katib_api/__init__.py` must match
-3. **Manifest tags** — all `newTag:` values in `manifests/v1beta1/installs` must equal the release tag
-4. **Changelog** — stable releases require `# [vX.Y.Z]` in `CHANGELOG.md` (skipped for RC)
-5. **Remote tag** — tag must not already exist on `origin` (unless `--skip-remote`)
-6. **Package build** — builds `kubeflow-katib` and `kubeflow_katib_api`, runs `twine check`
+3. **Changelog** — stable releases require `# [vX.Y.Z]` in `CHANGELOG.md` (skipped for RC)
+4. **Remote tag** — tag must not already exist on `origin` (unless `--skip-remote`)
+5. **Package build** — builds `kubeflow-katib` and `kubeflow_katib_api`, runs `twine check`
 
 Nothing is pushed, tagged, or published.
 
@@ -130,20 +134,16 @@ git diff --stat
 
 # Production release
 # - Merge PR (triggers real release), or
-# - Run workflow with dry_run: false after checklist sign-off
+# - Run workflow with dry_run: false after sign-off
 ```
 
-See [README.md](./README.md#pre-flight-checklist) for the full pre-flight checklist.
+See [RELEASE.md](../../RELEASE.md) for the full release process.
 
 ## Troubleshooting
 
 ### `Tag vX.Y.Z already exists on origin`
 
 The version was already released. Bump to a new patch/RC version in `setup.py` and re-run `make release`.
-
-### `Manifest newTag 'latest' does not match release tag`
-
-Run `make release VERSION=X.Y.Z` to update manifests, or verify you committed all manifest changes.
 
 ### `Missing CHANGELOG.md section`
 
@@ -169,8 +169,8 @@ Inspect build output under `sdk/python/v1beta1/dist/` and `api/python_api/dist/`
 
 | File | Purpose |
 | --- | --- |
+| `RELEASE.md` | Maintainer release guide |
 | `scripts/v1beta1/test-release.sh` | Local dry-run validator |
-| `scripts/v1beta1/prepare-release.sh` | Version/manifest bump helper |
+| `scripts/v1beta1/prepare-release.sh` | Version bump helper (manifests pinned in CI) |
 | `.github/workflows/release.yaml` | Release workflow |
 | `.github/workflows/check-release.yaml` | PR validation |
-| `docs/release/README.md` | Maintainer release guide |

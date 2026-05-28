@@ -63,18 +63,3 @@ jobs:
             echo "Version mismatch between SDK, gen-api.sh, and models"
             exit 1
           fi
-
-      - name: Validate manifest image tags
-        shell: bash
-        run: |
-          MANIFEST_TAGS=$(grep -r 'newTag:' manifests/v1beta1/installs | sed 's/.*newTag:[[:space:]]*//' | sort | uniq)
-          if [ -z "$MANIFEST_TAGS" ]; then
-            echo "No newTag found in manifests."
-            exit 1
-          fi
-          for t in ${MANIFEST_TAGS}; do
-            if [[ "${t}" != "${TAG}" ]]; then
-              echo "Manifest tag '${t}' does not match release tag '${TAG}'"
-              exit 1
-            fi
-          done
