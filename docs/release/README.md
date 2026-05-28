@@ -1,131 +1,229 @@
 # Release the Katib Project
 
-This is the instruction on how to make a new release for the Katib project.
+This guide follows the same release model as the [Kubeflow SDK](https://github.com/kubeflow/sdk/blob/main/RELEASE.md).
 
-## Prerequisite
+## Release timeline
 
-- Tools, defined in the [Contributing Guide](./../../CONTRIBUTING.md#requirements).
+| Step | Action | Outcome |
+| --- | --- | --- |
+| 0 | [One-time setup](#0-one-time-setup) | Infra ready for automated releases |
+| 1 | [Prepare locally](#1-prepare-locally) | Version bumps and changelog on disk |
+| 2 | [Validate locally](#2-validate-locally) | Dry-run checks pass |
+| 3 | [Pre-flight checklist](#3-pre-flight-checklist) | Ready to open or merge PR |
+| 4 | [Open a PR](#4-open-a-pr) | Review + Check Release CI |
+| 5 | [CI dry run (optional)](#5-ci-dry-run-optional) | Workflow validated on GitHub |
+| 6 | [Merge and automate](#6-merge-and-automate) | Branch, tag, images built |
+| 7 | [Approve publishing](#7-approve-publishing) | PyPI + GitHub Release |
+| 8 | [Verify release](#8-verify-release) | Artifacts live |
+| 9 | [Post-release](#9-post-release) | Follow-up tasks done |
+
+For fork testing and troubleshooting, see [RELEASE_TESTING.md](./RELEASE_TESTING.md).
+
+---
+
+## 0. One-time setup
+
+Complete once before your first release as a maintainer.
 
 - [Write](https://docs.github.com/en/organizations/managing-access-to-your-organizations-repositories/repository-permission-levels-for-an-organization#permission-levels-for-repositories-owned-by-an-organization)
   permission for the Katib repository.
 
-- Maintainer access to the [Katib SDK](https://pypi.org/project/kubeflow-katib/).
+- GitHub **`release` environment** with required reviewers (gates PyPI and GitHub Release jobs).
 
-- Owner access to the [Katib Dockerhub](https://hub.docker.com/u/kubeflowkatib).
+- [PyPI trusted publishing](https://docs.pypi.org/trusted-publishers/) for `kubeflow-katib` and `kubeflow_katib_api`
+  (workflow: `release.yaml`, owner: `kubeflow`, repo: `katib`).
 
-- Create a [GitHub Token](https://docs.github.com/en/github/authenticating-to-github/keeping-your-account-and-data-secure/creating-a-personal-access-token).
+- Repository secrets:
 
-- Install `PyGithub` to generate the [Changelog](./../../CHANGELOG.md): `pip install PyGithub==1.55`
+  | Secret | Description |
+  | --- | --- |
+  | `DOCKERHUB_USERNAME` | DockerHub username for `kubeflowkatib` |
+  | `DOCKERHUB_TOKEN` | DockerHub access token |
 
-- Install `build` to publish the Katib models: `pip install build`
+- Optional: [GitHub token](https://docs.github.com/en/github/authenticating-to-github/keeping-your-account-and-data-secure/creating-a-personal-access-token)
+  and `git-cliff` for auto-generated changelogs via `make release`.
 
-- Install `twine` to publish the SDK package: `pip install twine==3.4.1`
+### Versioning and branches
 
-  - Create a [PyPI Token](https://pypi.org/help/#apitoken) to publish Katib SDK.
+Katib follows [Semantic Versioning](https://semver.org/) and Python [PEP 440](https://peps.python.org/pep-0440/) for SDK packages.
 
-  - Add the following config to your `~/.pypirc` file:
+| Artifact | Format | Example |
+| --- | --- | --- |
+| Git tag | `vX.Y.Z` or `vX.Y.Z-rc.N` | `v0.19.1`, `v0.19.0-rc.0` |
+| Python SDK / API | `X.Y.Z` or `X.Y.ZrcN` | `0.19.1`, `0.19.0rc0` |
+| Release branch | `release-X.Y` | `release-0.19` |
 
-    ```
-    [pypi]
-       username = __token__
-       password = <PYPI_TOKEN>
-    ```
+- Latest minor release: prepare on `master`, merge PR → CI creates/updates `release-X.Y`.
+- Patch on an older minor line: cherry-pick to `release-X.Y`, prepare there, open PR to that branch.
 
-## Release Process
+---
 
-### Versioning Policy
+## 1. Prepare locally
 
-Katib version format follows [Semantic Versioning](https://semver.org/).
-Katib versions are in the format of `vX.Y.Z`, where `X` is the major version, `Y` is
-the minor version, and `Z` is the patch version.
-The patch version contains only bug fixes.
+From the repository root:
 
-Additionally, Katib does pre-releases in this format: `vX.Y.Z-rc.N` where `N` is a number
-of the `Nth` release candidate (RC) before an upcoming public release named `vX.Y.Z`.
+```sh
+make release VERSION=<X.Y.Z>
+# e.g. make release VERSION=0.19.1
+```
 
-### Release Branches and Tags
+This updates:
 
-Katib releases are tagged with tags like `vX.Y.Z`, for example `v0.11.0`.
+- `sdk/python/v1beta1/setup.py` → `version="X.Y.Z"`
+- `hack/python-api/gen-api.sh` and `api/python_api/kubeflow_katib_api/__init__.py`
+- Manifest image tags → `vX.Y.Z`
+- `CHANGELOG.md` (stable releases only, when `git-cliff` is installed)
 
-Release branches are in the format of `release-X.Y`, where `X.Y` stands for
-the minor release.
+Review the diff:
 
-`vX.Y.Z` releases are released from the `release-X.Y` branch. For example,
-`v0.11.1` release should be on `release-0.11` branch.
+```sh
+git diff
+git diff --stat
+```
 
-If you want to push changes to the `release-X.Y` release branch, you have to
-cherry pick your changes from the `master` branch and submit a PR.
+Nothing is pushed or published at this stage.
 
-### Versions for Katib Components
+---
 
-Katib release ([git tag](https://git-scm.com/book/en/v2/Git-Basics-Tagging))
-includes releases for the following components:
+## 2. Validate locally
 
-- Manifest images with tags equal to the release
-  (e.g [`v0.11.1`](https://github.com/kubeflow/katib/blob/v0.11.1/manifests/v1beta1/installs/katib-standalone/kustomization.yaml#L21-L33)).
+Run the local dry-run validator (mirrors the CI `dry_run: true` prepare + build jobs):
 
-- Katib Python SDK where version is in this format: `X.Y.Z` or `X.Y.ZrcN`
-  (e.g [`0.11.1`](https://github.com/kubeflow/katib/blob/v0.11.1/sdk/python/v1beta1/setup.py#L22)).
+```sh
+make test-release
+```
 
-### Create a new Katib Release
+Options:
 
-Follow these steps to cut a new Katib release:
+```sh
+./scripts/v1beta1/test-release.sh --skip-remote   # offline
+./scripts/v1beta1/test-release.sh --skip-build    # metadata only
+```
 
-1. Clone Katib repository under `$GOPATH/src` directory:
+Fix any failures before continuing. See [RELEASE_TESTING.md](./RELEASE_TESTING.md) for details.
 
-   ```
-   git clone git@github.com:kubeflow/katib.git $GOPATH/src/github.com/kubeflow/katib
-   ```
+---
 
-1. Make sure that you can build all Katib images. **Note** that
-   your Docker Desktop should
-   [enable containerd image store](https://docs.docker.com/desktop/containerd/#enable-the-containerd-image-store)
-   to build multi-arch images:
+## 3. Pre-flight checklist
 
-   ```
-   make build REGISTRY=private-registry TAG=latest
-   ```
+Complete before opening or merging the release PR.
 
-1. Create the new release:
+**Version and artifacts**
 
-   ```
-   make release BRANCH=release-X.Y TAG=vX.Y.Z
-   ```
+- [ ] Version follows semver (`X.Y.Z` / `X.Y.ZrcN` Python; `vX.Y.Z` / `vX.Y.Z-rc.N` git tag)
+- [ ] `setup.py`, `gen-api.sh`, and `kubeflow_katib_api/__init__.py` all match
+- [ ] Manifest `newTag:` values match `vX.Y.Z` (not `latest`)
+- [ ] Git tag does not already exist on [GitHub tags](https://github.com/kubeflow/katib/tags)
 
-   The above script is doing the following:
+**Changelog and commits**
 
-   - Create the new branch: `release-X.Y`, if it doesn't exist.
+- [ ] Stable release: `# [vX.Y.Z] (YYYY-MM-DD)` in `CHANGELOG.md`
+- [ ] RC release: changelog optional (GitHub Release uses auto-generated notes)
+- [ ] Required fixes cherry-picked to target branch (`master` or `release-X.Y`)
 
-   - Create the new tag: `vX.Y.Z` from the release branch: `release-X.Y`.
+**CI and approvals**
 
-   - Publish Katib images with the tag: `vX.Y.Z` and update manifests.
+- [ ] Local dry run passed (`make test-release`)
+- [ ] A maintainer is available to approve PyPI and GitHub Release steps
 
-   - Publish Katib Python SDK with the version: `X.Y.Z`.
+**Post-release planning**
 
-   - Publish Katib models with the version: `X.Y.Z` for Kubeflow SDK.
+- [ ] Announcement planned for minor/major releases (Slack / mailing list)
+- [ ] Follow-up PR to `master` planned if releasing from a `release-X.Y` patch branch
 
-   - Push above changes to the Katib upstream `release-X.Y` branch with this commit:
-     `Katib official release vX.Y.Z`
+---
 
-1. Submit a PR to update the SDK version on the `master` branch to the latest release.
-   (e.g. [`#1640`](https://github.com/kubeflow/katib/pull/1640)).
+## 4. Open a PR
 
-1. Update the Changelog by running:
+Commit your changes and open a pull request:
 
-   ```
-   python docs/release/changelog.py --token=<github-token> --range=<previous-release>..<current-release>
-   ```
+- **Latest minor series** → PR to `master`
+- **Older patch** (e.g. `0.18.1` while master is `0.19.x`) → PR to `release-0.18`
 
-   If you are creating the **first minor pre-release** or the **minor** release (`X.Y`), your
-   `previous-release` is equal to the latest release on the `release-X.Y-1` branch.
-   For example: `--range=v0.11.1..v0.12.0`
+Wait for [Check Release](https://github.com/kubeflow/katib/actions/workflows/check-release.yaml) to pass.
+It validates version consistency, tag uniqueness, and manifest tags on PRs that touch release files.
 
-   Otherwise, your `previous-release` is equal to the latest release on the `release-X.Y` branch.
-   For example: `--range=v0.12.0-rc.0..v0.12.0-rc.1`
+---
 
-   Group PRs in the Changelog into Features, Bug fixes, Documentation, etc.
-   Check this example: [v0.11.0](https://github.com/kubeflow/katib/releases/tag/v0.11.0)
+## 5. CI dry run (optional)
 
-   Finally, submit a PR with the updated Changelog.
+Recommended before merge, especially for first-time release automation changes.
 
-1. If it is not a pre-release, draft [a new GitHub Release](https://github.com/kubeflow/katib/releases/new).
+1. Go to [Actions → Release](https://github.com/kubeflow/katib/actions/workflows/release.yaml)
+2. **Run workflow** on your PR branch
+3. Leave **`dry_run` enabled** (default)
+
+| Job | Dry run behavior |
+| --- | --- |
+| Prepare | Validates version; prints branch/tag plan; **does not push** |
+| Build | Verifies versions, changelog, builds packages, `twine check` |
+| Dry run summary | Pass/fail on the workflow run page |
+| Create tag / Images / PyPI / GitHub Release | **Skipped** |
+
+---
+
+## 6. Merge and automate
+
+Merge the release PR. A push to `master` or `release-*` that changes `setup.py` triggers the
+[Release workflow](https://github.com/kubeflow/katib/actions/workflows/release.yaml), which:
+
+1. **Prepare** — creates or updates `release-X.Y` (cherry-picks from `master` if needed)
+2. **Build** — validates versions, builds Python packages, uploads artifacts
+3. **Tag** — creates and pushes `vX.Y.Z`
+4. **Publish images** — multi-arch images to GHCR and DockerHub
+
+Confirm the release branch and tag appear on GitHub.
+
+**Alternative:** Re-run the Release workflow manually with **`dry_run: false`** on the release branch
+(only after checklist + dry run pass).
+
+> **Warning:** `dry_run: false` pushes branches, tags, and images immediately.
+
+---
+
+## 7. Approve publishing
+
+Publishing steps wait in the GitHub **`release`** environment for maintainer approval.
+
+1. [GitHub Actions](https://github.com/kubeflow/katib/actions) → **Release** workflow run → Approve **Publish to PyPI**
+2. After PyPI succeeds → Approve **Create GitHub Release**
+
+---
+
+## 8. Verify release
+
+- [ ] Images on [GHCR](https://github.com/kubeflow/katib/pkgs/container/katib) and [DockerHub](https://hub.docker.com/u/kubeflowkatib)
+- [ ] Packages on [PyPI kubeflow-katib](https://pypi.org/project/kubeflow-katib/) and [kubeflow-katib-api](https://pypi.org/project/kubeflow-katib-api/)
+- [ ] Release on [GitHub Releases](https://github.com/kubeflow/katib/releases)
+- [ ] Smoke test: `pip install kubeflow-katib==X.Y.Z`
+
+---
+
+## 9. Post-release
+
+- Submit a PR to bump the SDK version on `master` if the release was cut from a `release-X.Y` patch branch.
+- Announce minor/major releases on community channels if applicable.
+
+If you did not use `git-cliff`, update `CHANGELOG.md` manually:
+
+```sh
+python docs/release/changelog.py --token=<github-token> --range=<previous-release>..<current-release>
+```
+
+---
+
+## Appendix
+
+### Manual release (legacy)
+
+Not recommended — builds images locally without multi-arch by default.
+
+```sh
+make release-manual BRANCH=release-X.Y TAG=vX.Y.Z
+```
+
+See [CONTRIBUTING.md](./../../CONTRIBUTING.md#requirements) for local tooling.
+
+### Local and fork testing
+
+See [RELEASE_TESTING.md](./RELEASE_TESTING.md) for the test script, fork workflow, and troubleshooting.
